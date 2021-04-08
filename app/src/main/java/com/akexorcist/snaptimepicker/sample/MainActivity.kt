@@ -1,6 +1,7 @@
 package com.akexorcist.snaptimepicker.sample
 
 import android.os.Bundle
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import com.akexorcist.snaptimepicker.SnapTimePickerDialog
 import com.akexorcist.snaptimepicker.TimeRange
@@ -23,7 +24,12 @@ class MainActivity : AppCompatActivity() {
                 setTitle(R.string.title)
                 setTitleColor(R.color.colorWhite)
             }.build().apply {
-                setListener { hour, minute -> onTimePicked(hour, minute) }
+                setOnConfirmListener { hour, minute ->
+                    onTimePicked(hour, minute)
+                }
+                setOnDismissListener {
+                    Log.i("SnapTimePickerDialog", "Dismissed")
+                }
             }.show(supportFragmentManager, SnapTimePickerDialog.TAG)
         }
 

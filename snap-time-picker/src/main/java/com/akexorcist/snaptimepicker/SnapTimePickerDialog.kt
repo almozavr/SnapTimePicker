@@ -1,6 +1,7 @@
 package com.akexorcist.snaptimepicker
 
 import android.app.Activity
+import android.content.DialogInterface
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
@@ -47,27 +48,35 @@ class SnapTimePickerDialog : BaseSnapTimePickerDialogFragment() {
     private var positiveButtonColor: Int = -1
     private var buttonTextAllCaps = true
     private var timeInterval: Int = 1
-    private var listener: Listener? = null
+    private var confirmListener: ConfirmListener? = null
+    private var dismissListener: DismissListener? = null
 
     private var lastSelectedHour = -1
     private var lastSelectedMinute = -1
 
     companion object {
-        private const val EXTRA_SELECTABLE_TIME_RANGE = "com.akexorcist.snaptimepicker.selectable_time_range"
+        private const val EXTRA_SELECTABLE_TIME_RANGE =
+            "com.akexorcist.snaptimepicker.selectable_time_range"
         private const val EXTRA_PRESELECTED_TIME = "com.akexorcist.snaptimepicker.preselected_time"
         private const val EXTRA_SELECTED_HOUR = "com.akexorcist.snaptimepicker.selected_hour"
         private const val EXTRA_SELECTED_MINUTE = "com.akexorcist.snaptimepicker.selected_minute"
-        private const val EXTRA_IS_USE_VIEW_MODEL = "com.akexorcist.snaptimepicker.is_use_view_model"
+        private const val EXTRA_IS_USE_VIEW_MODEL =
+            "com.akexorcist.snaptimepicker.is_use_view_model"
         private const val EXTRA_TITLE = "com.akexorcist.snaptimepicker.title"
         private const val EXTRA_SUFFIX = "com.akexorcist.snaptimepicker.suffix"
         private const val EXTRA_PREFIX = "com.akexorcist.snaptimepicker.prefix"
         private const val EXTRA_TITLE_COLOR = "com.akexorcist.snaptimepicker.title_color"
         private const val EXTRA_THEME_COLOR = "com.akexorcist.snaptimepicker.theme_color"
-        private const val EXTRA_NEGATIVE_BUTTON_TEXT = "com.akexorcist.snaptimepicker.negative_button_text"
-        private const val EXTRA_POSITIVE_BUTTON_TEXT = "com.akexorcist.snaptimepicker.positive_button_text"
-        private const val EXTRA_NEGATIVE_BUTTON_COLOR = "com.akexorcist.snaptimepicker.negative_button_color"
-        private const val EXTRA_POSITIVE_BUTTON_COLOR = "com.akexorcist.snaptimepicker.positive_button_color"
-        private const val EXTRA_BUTTON_TEXT_ALL_CAPS = "com.akexorcist.snaptimepicker.button_text_all_caps"
+        private const val EXTRA_NEGATIVE_BUTTON_TEXT =
+            "com.akexorcist.snaptimepicker.negative_button_text"
+        private const val EXTRA_POSITIVE_BUTTON_TEXT =
+            "com.akexorcist.snaptimepicker.positive_button_text"
+        private const val EXTRA_NEGATIVE_BUTTON_COLOR =
+            "com.akexorcist.snaptimepicker.negative_button_color"
+        private const val EXTRA_POSITIVE_BUTTON_COLOR =
+            "com.akexorcist.snaptimepicker.positive_button_color"
+        private const val EXTRA_BUTTON_TEXT_ALL_CAPS =
+            "com.akexorcist.snaptimepicker.button_text_all_caps"
         private const val EXTRA_TIME_INTERVAL = "com.akexorcist.snaptimepicker.time_interval"
         private const val MIN_HOUR = 0
         private const val MAX_HOUR = 23
@@ -166,13 +175,17 @@ class SnapTimePickerDialog : BaseSnapTimePickerDialogFragment() {
 
             if (negativeButtonColor != -1) {
                 context?.let { context ->
-                    binding.buttonCancel.setTextColor(ContextCompat.getColor(context, negativeButtonColor))
+                    binding.buttonCancel.setTextColor(
+                        ContextCompat.getColor(context, negativeButtonColor)
+                    )
                 }
             }
 
             if (positiveButtonColor != -1) {
                 context?.let { context ->
-                    binding.buttonConfirm.setTextColor(ContextCompat.getColor(context, positiveButtonColor))
+                    binding.buttonConfirm.setTextColor(
+                        ContextCompat.getColor(context, positiveButtonColor)
+                    )
                 }
             }
 
@@ -260,6 +273,11 @@ class SnapTimePickerDialog : BaseSnapTimePickerDialogFragment() {
 
     override fun setup() {}
 
+    override fun onDismiss(dialog: DialogInterface) {
+        dismissListener?.invoke()
+        super.onDismiss(dialog)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         binding.recyclerViewHour.removeOnScrollListener(hourScrollListener)
@@ -298,16 +316,28 @@ class SnapTimePickerDialog : BaseSnapTimePickerDialogFragment() {
         }
     }
 
+    @Deprecated(
+        "use dedicated listener",
+        replaceWith = ReplaceWith("setOnConfirmListener(listener)")
+    )
     fun setListener(listener: Listener?) {
-        this.listener = listener
+        this.confirmListener = listener?.let { { hour, minute -> it.onTimePicked(hour, minute) } }
     }
 
+    @Deprecated(
+        "use dedicated listener",
+        replaceWith = ReplaceWith("setOnConfirmListener(onTimePicked)")
+    )
     fun setListener(onTimePicked: (hour: Int, minute: Int) -> Unit) {
-        this.listener = object : Listener {
-            override fun onTimePicked(hour: Int, minute: Int) {
-                onTimePicked(hour, minute)
-            }
-        }
+        this.confirmListener = onTimePicked
+    }
+
+    fun setOnConfirmListener(listener: ConfirmListener?) {
+        this.confirmListener = listener
+    }
+
+    fun setOnDismissListener(listener: DismissListener?) {
+        this.dismissListener = listener
     }
 
     fun isUseViewModel(): Boolean = isUseViewModel
@@ -559,10 +589,8 @@ class SnapTimePickerDialog : BaseSnapTimePickerDialogFragment() {
         activity?.let { _ ->
             val viewModel: SnapTimePickerViewModel =
                 ViewModelProvider(this).get(SnapTimePickerViewModel::class.java)
-            this.listener = object : Listener {
-                override fun onTimePicked(hour: Int, minute: Int) {
-                    viewModel.onTimePicked(hour, minute)
-                }
+            this.confirmListener = { hour: Int, minute: Int ->
+                viewModel.onTimePicked(hour, minute)
             }
         }
     }
@@ -578,7 +606,7 @@ class SnapTimePickerDialog : BaseSnapTimePickerDialogFragment() {
         hourSnappedView?.let { view ->
             hour = hourAdapter.getValueByPosition(hourLayoutManager.getPosition(view))
         }
-        listener?.onTimePicked(hour, minute)
+        confirmListener?.invoke(hour, minute)
         targetFragment?.onActivityResult(targetRequestCode, Activity.RESULT_OK, Intent().apply {
             putExtra(EXTRA_SELECTED_HOUR, hour)
             putExtra(EXTRA_SELECTED_MINUTE, minute)
@@ -611,6 +639,7 @@ class SnapTimePickerDialog : BaseSnapTimePickerDialogFragment() {
                 (startHour > endHour || (startHour == endHour && startMinute > endMinute))
     }
 
+    @Deprecated("use ConfirmListener")
     interface Listener {
         fun onTimePicked(hour: Int, minute: Int)
     }
@@ -706,3 +735,6 @@ class SnapTimePickerDialog : BaseSnapTimePickerDialogFragment() {
             )
     }
 }
+
+private typealias ConfirmListener = (hour: Int, minute: Int) -> Unit
+private typealias DismissListener = () -> Unit
